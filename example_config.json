@@ -1,0 +1,16 @@
+// You can use ERB tags in this!
+{
+	// array of CQ/AEM dev instance hostnames with HTTP basic auth and port
+	"instances": [
+		"http://admin:<%= ENV["CQ_PASSWORD"] %>@localhost:4502"
+	],
+	// array of relative paths to vault package roots (where jcr_root and META-INF live)
+	"jcrRootPaths": [
+		"jcr_content/src/content/jcr_root"
+	],
+	// array of objects specifying filesystem to jcr path mappings. Haven't finished this yet.
+	"slingInitialContentPaths": [
+		{"filesystem": "java-core/src/main/resources/components", "jcr": "/apps/clf/components"},
+		{"filesystem": "java-core/src/main/resources/clientlibs", "jcr": "/etc/designs/clf/clientlibs"}
+	]
+}
