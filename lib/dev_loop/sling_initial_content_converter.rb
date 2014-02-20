@@ -1,3 +1,6 @@
+require 'json'
+require 'builder'
+
 module DevLoop
   class SlingInitialContentConverter
     def self.convert(json_string)
@@ -8,6 +11,28 @@ module DevLoop
       builder.tag!("jcr:root", namespaces.merge(serialized_attributes)) do |b|
         add_children(children, b)
       end
+    end
+
+    def self.convert_package(package_path)
+      json_files = json_files_within(package_path)
+      json_files.each do |json_file|
+        content_xml_path = generate_content_xml_path(json_file)
+        FileUtils.mkdir_p(content_xml_path.parent)
+        xml_string = convert(File.read(json_file))
+        File.open(content_xml_path, 'w') {|f| f.write(xml_string) }
+        FileUtils.rm(json_file)
+      end
+    end
+
+    def self.json_files_within(path)
+      glob_path = Pathname(path).to_s + "/**/*"
+      Dir.glob(glob_path.to_s).delete_if {|path| !path.match(/\.json$/) }
+    end
+
+    def self.generate_content_xml_path(json_path)
+      raise ArgumentError, "#{json_path} must end in .json" unless json_path.end_with?(".json")
+      node_name = File.basename(json_path, ".json")
+      Pathname(json_path).parent + node_name + ".content.xml"
     end
 
     def self.add_children(children, builder)

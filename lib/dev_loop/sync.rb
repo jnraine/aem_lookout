@@ -32,20 +32,45 @@ module DevLoop
       default_log = Logger.new(options.fetch(:output, STDOUT))
       @log = options.fetch(:log, default_log)
       @hostnames = options.fetch(:hostnames).map {|hostname| Hostname.new(hostname) }
-      
-      @filesystem_path = if options.fetch(:filesystem).end_with?(".content.xml")
-        Pathname(options.fetch(:filesystem)).parent.to_s
-      else
-        options.fetch(:filesystem)
-      end
-      
-      @jcr_path = if options.fetch(:jcr).end_with?(".content.xml")
-        Pathname(options.fetch(:jcr)).parent.to_s
-      else
-        options.fetch(:jcr)
-      end
+      @sling_initial_content = options.fetch(:sling_initial_content, false)
+      @filesystem_path = options.fetch(:filesystem)
+      @jcr_path = options.fetch(:jcr)
     rescue KeyError => e
       raise ArgumentError.new("#{e.message} (missing a hash argument)")
+    end
+
+    # Locals on the local filesystem to copy into the package
+    def content_paths
+      if @content_paths.nil?
+        paths = if filesystem_path.end_with?(".content.xml")
+          Pathname(filesystem_path).parent.to_s
+        elsif sling_initial_content? and filesystem_path.end_with?(".json")
+          [filesystem_path, filesystem_path.gsub(/.json$/, "")].delete_if { |path| !File.exist?(path) }
+        else
+          filesystem_path
+        end
+
+        @content_paths = Array(paths)
+      end
+
+      @content_paths
+    end
+
+    # Paths in the package to install into the JCR
+    def filter_paths
+      if @filter_paths.nil?
+        paths = if jcr_path.end_with?(".content.xml")
+          Pathname(jcr_path).parent.to_s
+        elsif sling_initial_content? and jcr_path.end_with?(".json")
+          jcr_path.gsub(/.json$/, "")
+        else
+          jcr_path
+        end
+
+        @filter_paths = Array(paths)
+      end
+
+      @filter_paths
     end
 
     def run
@@ -65,18 +90,35 @@ module DevLoop
     end
 
     def build_package
-      FileUtils.mkdir_p(target_content)
-      FileUtils.cp_r(filesystem_path, target_content)
+      copy_content_to_package
+      create_settings
+      create_filter
+      SlingInitialContentConverter.convert_package(package_path) if sling_initial_content?
+      sleep 0.1 # just in case
+    end
 
-      FileUtils.mkdir_p(vault_path)
-      File.open(vault_path + "settings.xml", 'w') {|f| f.write(settings_template) }
+    def copy_content_to_package
+      FileUtils.mkdir_p(target_content_path_root)
+      content_paths.each do |content_path|
+        log.info "Copying content from #{content_path} to target content path root"
+        FileUtils.cp_r(content_path, target_content_path_root)
+      end
+    end
 
-      File.open(vault_path + "filter.xml", 'w') do |f| 
-        paths = [jcr_path] # only do one path at the moment
+    def create_settings
+      FileUtils.mkdir_p(vault_config_path)
+      File.open(vault_config_path + "settings.xml", 'w') {|f| f.write(settings_template) }
+    end
+
+    def create_filter
+      File.open(vault_config_path + "filter.xml", 'w') do |f|
+        paths = filter_paths
         f.write(ERB.new(filter_template).result(binding))
       end
+    end
 
-      sleep 0.1 until Dir.exist?(package_path)
+    def sling_initial_content_filter_paths_for(jcr_path)
+      
     end
 
     def install_package
@@ -91,11 +133,11 @@ module DevLoop
       threads.each {|thread| thread.join } # wait for threads
     end
 
-    def vault_path
+    def vault_config_path
       package_path + "META-INF/vault"
     end
 
-    def target_content
+    def target_content_path_root
       (jcr_root_path + jcr_path.gsub(/^\//, "")).parent
     end
 
@@ -105,6 +147,10 @@ module DevLoop
 
     def jcr_root_path
       @jcr_root ||= package_path + "jcr_root"
+    end
+
+    def sling_initial_content?
+      @sling_initial_content
     end
 
     def settings_template

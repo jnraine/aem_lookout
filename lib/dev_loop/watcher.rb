@@ -17,6 +17,10 @@ module DevLoop
         Thread.new { watch_vault_package(jcr_root_paths) }
       end
 
+      threads += sling_initial_content_paths.map do |sling_initial_content_path|
+        Thread.new { watch_sling_initial_content(sling_initial_content_path) }
+      end
+
       wait_for(threads)
     end
 
@@ -58,8 +62,59 @@ module DevLoop
       fsevent.run
     end
 
+    def watch_sling_initial_content(path)
+      filesystem_path = path.fetch("filesystem")
+      jcr_path = path.fetch("jcr")
+
+      if !File.exist?(filesystem_path)
+        log.warn "Filesystem path for Sling-Initial-Content points to non-existing directory: #{filesystem_path}"
+        return
+      end
+
+      fsevent = FSEvent.new
+      options = {:latency => 0.1, :file_events => true}
+
+      fsevent.watch filesystem_path, options do |paths|
+        paths.delete_if {|path| ignored?(path) }
+        log.info "Detected change inside: #{paths.inspect}"
+
+        paths.each do |path|
+          if !File.exist?(path)
+            log.info "#{path} no longer exists, syncing parent instead"
+            path = File.dirname(path)
+          end
+
+          relative_jcr_path = path.gsub(/^.+#{filesystem_path}\//, "")
+
+          DevLoop::Sync.new(
+            hostnames: hostnames,
+            filesystem: path,
+            jcr: (Pathname(jcr_path) + relative_jcr_path).to_s,
+            log: log,
+            sling_initial_content: true
+          ).run
+        end
+      end
+
+      log.info "Watching Sling-Initial-Content at #{filesystem_path} for changes..."
+      fsevent.run
+    end
+
     def jcr_root_paths
       config.fetch("jcrRootPaths", []).map {|jcr_root_path| Pathname(repo_path) + jcr_root_path }.map(&:to_s)
+    end
+
+    def sling_initial_content_paths
+      config.fetch("slingInitialContentPaths", []).map do |sling_initial_content_path|
+        validate_sling_initial_content_path!(sling_initial_content_path)
+        sling_initial_content_path
+      end
+    end
+
+    def validate_sling_initial_content_path!(path)
+      unless path.has_key?("filesystem") and path.has_key?("jcr")
+        raise "slingInitialContentPaths entry is malformed (requires \"filesystem\" and \"jcr\" entry): #{path.inspect}"
+      end
     end
 
     def hostnames
