@@ -1,4 +1,4 @@
-module DevLoop
+module AemLookout
   class Watcher
     def self.run(repo_path, config)
       self.new(repo_path, config).run
@@ -53,7 +53,7 @@ module DevLoop
 
           jcr_path = discover_jcr_path_from_file_in_vault_package(path)
 
-          DevLoop::Sync.new(
+          AemLookout::Sync.new(
             hostnames: hostnames,
             filesystem: path,
             jcr: jcr_path,
@@ -90,7 +90,7 @@ module DevLoop
 
           relative_jcr_path = path.gsub(/^.+#{filesystem_path}\//, "")
 
-          DevLoop::Sync.new(
+          AemLookout::Sync.new(
             hostnames: hostnames,
             filesystem: path,
             jcr: (Pathname(jcr_path) + relative_jcr_path).to_s,

@@ -1,5 +1,5 @@
 $: << File.expand_path("..", File.dirname(__FILE__))
-require 'dev_loop'
+require 'aem_lookout'
 
 RSpec.configure do |config|
   config.treat_symbols_as_metadata_keys_with_true_values = true

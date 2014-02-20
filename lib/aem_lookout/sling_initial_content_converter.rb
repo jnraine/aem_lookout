@@ -1,7 +1,7 @@
 require 'json'
 require 'builder'
 
-module DevLoop
+module AemLookout
   class SlingInitialContentConverter
     def self.convert(json_string)
       node_data = JSON.parse(json_string)

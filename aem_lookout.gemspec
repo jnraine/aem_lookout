@@ -1,11 +1,11 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'dev_loop/version'
+require 'aem_lookout/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "dev_loop"
-  spec.version       = DevLoop::VERSION
+  spec.name          = "aem_lookout"
+  spec.version       = AemLookout::VERSION
   spec.authors       = ["Jordan Raine"]
   spec.email         = ["jnraine@gmail.com"]
   spec.summary       = %q{Speeds up iteration loop while developing for AEM/CQ.}
@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
-  spec.executables   = ["dev_loop"]
+  spec.executables   = ["aem_lookout", "lookout"]
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 

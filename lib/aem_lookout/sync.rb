@@ -4,7 +4,7 @@ require 'erb'
 require 'tmpdir'
 require 'logger'
 
-module DevLoop
+module AemLookout
   class Sync
     class Hostname
       attr_accessor :url
@@ -125,7 +125,7 @@ module DevLoop
       threads = hostnames.map do |hostname|
         Thread.new do
           log.info "Installing package at #{package_path} to #{hostname.url_without_credentials}"
-          command = "#{DevLoop.vlt_executable} --credentials #{hostname.credentials} -v import #{hostname.url_without_credentials} #{package_path} /"
+          command = "#{AemLookout.vlt_executable} --credentials #{hostname.credentials} -v import #{hostname.url_without_credentials} #{package_path} /"
           Terminal.new(log).execute_command(command)
         end
       end

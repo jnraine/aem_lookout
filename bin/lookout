@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 $: << File.dirname(__FILE__) + "/lib"
-require 'dev_loop'
+require 'aem_lookout'
 require 'rb-fsevent'
 require 'optparse'
 require 'json'
@@ -30,9 +30,9 @@ rescue KeyError
 end
 
 def config
-  template = File.read(@cq_repo_path + "/dev_loop.json")
+  template = File.read(@cq_repo_path + "/aem_lookout.json")
   result = ERB.new(template).result
   JSON.parse(result)
 end
 
-DevLoop::Watcher.run(@cq_repo_path, config)
+AemLookout::Watcher.run(@cq_repo_path, config)

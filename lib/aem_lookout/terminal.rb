@@ -2,7 +2,7 @@ require 'open3'
 
 # A helper class for running terminal commands in the background while 
 # streaming to a Ruby logger.
-module DevLoop
+module AemLookout
   class Terminal
     attr_reader :log
 
