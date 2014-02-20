@@ -30,7 +30,7 @@ rescue KeyError
 end
 
 def config
-  template = File.read(@cq_repo_path + "/aem_lookout.json")
+  template = File.read(@cq_repo_path + "/lookout.json")
   result = ERB.new(template).result
   JSON.parse(result)
 end
