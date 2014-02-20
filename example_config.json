@@ -12,5 +12,10 @@
 	"slingInitialContentPaths": [
 		{"filesystem": "java-core/src/main/resources/components", "jcr": "/apps/clf/components"},
 		{"filesystem": "java-core/src/main/resources/clientlibs", "jcr": "/etc/designs/clf/clientlibs"}
+	],
+	// generic commands to do something when a specific 
+	"commands": [
+		// watch a bundle for changes to classes and install to local instance when it happens
+		{"watch": "java-core/src/main/java", "pwd": "java-core", "command": "mvn install -P author-localhost"}
 	]
 }

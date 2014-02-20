@@ -21,6 +21,10 @@ module DevLoop
         Thread.new { watch_sling_initial_content(sling_initial_content_path) }
       end
 
+      threads += command_configs.map do |command_config|
+        Thread.new { watch_command_config(command_config) }
+      end
+
       wait_for(threads)
     end
 
@@ -100,6 +104,25 @@ module DevLoop
       fsevent.run
     end
 
+    def watch_command_config(command_config)
+      watch_path = command_config.fetch("watch")
+      pwd = Pathname(repo_path) + command_config.fetch("pwd", "")
+      command = command_config.fetch("command")
+
+      fsevent = FSEvent.new
+      options = {:latency => 1, :file_events => true}
+      fsevent.watch watch_path, options do |paths|
+        paths.delete_if {|path| ignored?(path) }
+        break if paths.empty?
+        log.info "Detected change inside: #{paths.inspect}"
+        log.info "Running command"
+        Terminal.new(log).execute_command("cd #{pwd} && #{command}")
+      end
+
+      log.info "Watching #{watch_path}, changes will run #{command.inspect}..."
+      fsevent.run
+    end
+
     def jcr_root_paths
       config.fetch("jcrRootPaths", []).map {|jcr_root_path| Pathname(repo_path) + jcr_root_path }.map(&:to_s)
     end
@@ -108,6 +131,22 @@ module DevLoop
       config.fetch("slingInitialContentPaths", []).map do |sling_initial_content_path|
         validate_sling_initial_content_path!(sling_initial_content_path)
         sling_initial_content_path
+      end
+    end
+
+    # Something like this [{"watch" => "java-core/src/main/java", "pwd" => "java-core", "command" => "mvn install -P author-localhost"}]
+    def command_configs
+      config.fetch("commands", []).map do |command_config|
+        validate_command_config!(command_config)
+        command_config
+      end
+    end
+
+    # Ensures required keys are present. This is ugly.
+    def validate_command_config!(command_config)
+      required_keys = ["watch", "command"]
+      unless command_config.has_key?(required_keys.first) and command_config.has_key?(required_keys.last)
+        raise "commands entry is malformed (requires these keys: #{required_keys.join(", ")}): #{command_config.inspect}"
       end
     end
 
