@@ -11,6 +11,8 @@ module AemLookout
       builder.tag!("jcr:root", namespaces.merge(serialized_attributes)) do |b|
         add_children(children, b)
       end
+    rescue JSON::ParserError => e
+      raise SlingInitialContentConverterError, "A problem occurred while parsing JSON descriptor file: #{e.message}"
     end
 
     def self.convert_package(package_path)
@@ -56,7 +58,13 @@ module AemLookout
         end
       end
 
-      [serialized_attributes, children]
+      [default_attributes.merge(serialized_attributes), children]
+    end
+
+    def self.default_attributes
+      {
+        "jcr:primaryType" => "nt:unstructured"
+      }
     end
 
     # All known namespaces
@@ -85,4 +93,6 @@ module AemLookout
       end
     end
   end
+
+  class SlingInitialContentConverterError < LookoutError; end
 end

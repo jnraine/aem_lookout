@@ -43,7 +43,7 @@ module AemLookout
 
       fsevent.watch jcr_root.to_s, options do |paths|
         paths.delete_if {|path| ignored?(path) }
-        log.info "Detected change inside: #{paths.inspect}"
+        log.info "Detected change inside: #{paths.inspect}" unless paths.empty?
 
         paths.each do |path|
           if !File.exist?(path)
@@ -80,28 +80,36 @@ module AemLookout
 
       fsevent.watch filesystem_path, options do |paths|
         paths.delete_if {|path| ignored?(path) }
-        log.info "Detected change inside: #{paths.inspect}"
-
-        paths.each do |path|
-          if !File.exist?(path)
-            log.info "#{path} no longer exists, syncing parent instead"
-            path = File.dirname(path)
-          end
-
-          relative_jcr_path = path.gsub(/^.+#{filesystem_path}\//, "")
-
-          AemLookout::Sync.new(
-            hostnames: hostnames,
-            filesystem: path,
-            jcr: (Pathname(jcr_path) + relative_jcr_path).to_s,
-            log: log,
-            sling_initial_content: true
-          ).run
+        log.info "Detected change inside: #{paths.inspect}" unless paths.empty?
+        
+        begin
+          handle_sling_initial_content_change(paths, filesystem_path, jcr_path)
+        rescue LookoutError => e
+          log.error "An error occurred while handling sling initial content change: #{e.message}"
         end
       end
 
       log.info "Watching Sling-Initial-Content at #{filesystem_path} for changes..."
       fsevent.run
+    end
+
+    def handle_sling_initial_content_change(paths, filesystem_path, jcr_path)
+      paths.each do |path|
+        if !File.exist?(path)
+          log.info "#{path} no longer exists, syncing parent instead"
+          path = File.dirname(path)
+        end
+
+        relative_jcr_path = path.gsub(/^.+#{filesystem_path}\//, "")
+
+        AemLookout::Sync.new(
+          hostnames: hostnames,
+          filesystem: path,
+          jcr: (Pathname(jcr_path) + relative_jcr_path).to_s,
+          log: log,
+          sling_initial_content: true
+        ).run
+      end
     end
 
     def watch_command_config(command_config)
@@ -164,6 +172,7 @@ module AemLookout
     def ignored?(file)
       return true if File.extname(file) == ".tmp"
       return true if file.match(/___$/)
+      return true if File.basename(file) == ".DS_Store"
       return false
     end
 
