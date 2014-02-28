@@ -122,15 +122,25 @@ module AemLookout
     end
 
     def install_package
+      hostnames.map do |hostname|
+        install_package_to_hostname(hostname)
+      end
+    end
+
+    def install_package_multithreaded
       threads = hostnames.map do |hostname|
         Thread.new do
-          log.info "Installing package at #{package_path} to #{hostname.url_without_credentials}"
-          command = "#{AemLookout.vlt_executable} --credentials #{hostname.credentials} -v import #{hostname.url_without_credentials} #{package_path} /"
-          Terminal.new(log).execute_command(command)
+          install_package_to_hostname(hostname)
         end
       end
 
       threads.each {|thread| thread.join } # wait for threads
+    end
+
+    def install_package_to_hostname(hostname)
+      log.info "Installing package at #{package_path} to #{hostname.url_without_credentials}"
+      command = "#{AemLookout.vlt_executable} --credentials #{hostname.credentials} -v import #{hostname.url_without_credentials} #{package_path} /"
+      Terminal.new(log).execute_command(command)
     end
 
     def vault_config_path

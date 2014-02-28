@@ -29,7 +29,7 @@ module AemLookout
     end
 
     def wait_for(threads)
-      sleep 1 until threads.map {|thread| thread.join(1) }.all? {|result| result }
+      sleep 1 until Array(threads).map {|thread| thread.join(1) }.all? {|result| result }
     end
 
     def watch_vault_package(jcr_root)
@@ -38,32 +38,73 @@ module AemLookout
         return
       end
 
-      fsevent = FSEvent.new
       options = {:latency => 0.1, :file_events => true}
-
-      fsevent.watch jcr_root.to_s, options do |paths|
-        paths.delete_if {|path| ignored?(path) }
-        log.info "Detected change inside: #{paths.inspect}" unless paths.empty?
-
-        paths.each do |path|
-          if !File.exist?(path)
-            log.info "#{path} no longer exists, syncing parent instead"
-            path = File.dirname(path)
-          end
-
-          jcr_path = discover_jcr_path_from_file_in_vault_package(path)
-
-          AemLookout::Sync.new(
-            hostnames: hostnames,
-            filesystem: path,
-            jcr: jcr_path,
-            log: log
-          ).run
-        end
+      fsevent = create_threaded_fsevent jcr_root.to_s, options do |paths|
+        sync_vault_package_paths(paths)
       end
 
       log.info "Watching jcr_root at #{jcr_root} for changes..."
       fsevent.run
+    end
+
+    # Watch a given path with speified options and call action_block when a 
+    # non-ignored path is modified. This also ensures that only one 
+    # action_block is running at a time, killing any other running
+    # blocks before starting a new one.
+    def create_threaded_fsevent(watch_path, options, &action_block)
+      fsevent = FSEvent.new
+      running_jobs = Set.new
+
+      fsevent.watch watch_path, options do |paths|
+        paths.delete_if {|path| ignored?(path) }
+        log.warn "Detected change inside: #{paths.inspect}" unless paths.empty?
+
+        if running_jobs.length > 0
+          log.warn "A job is currently running for this watcher, killing..."
+          running_jobs.each {|thread| thread.kill }
+        else
+          log.warn "Phew, no running jobs: #{running_jobs}"
+        end
+
+        job = Thread.new do
+          action_block.call(paths)
+          Thread.exit
+        end
+
+        track_job_on_list(job, running_jobs)
+      end
+
+      fsevent
+    end
+
+    # Adds to running job list and removes from list when thread completes.
+    def track_job_on_list(job, running_jobs)
+      Thread.new do
+        running_jobs << job
+        log.warn "Waiting for #{job} to finish"
+        wait_for(job)
+        log.warn "#{job} job finished"
+        running_jobs.delete(job)
+        Thread.exit
+      end
+    end
+
+    def sync_vault_package_paths(paths)
+      paths.each do |path|
+        if !File.exist?(path)
+          log.warn "#{path} no longer exists, syncing parent instead"
+          path = File.dirname(path)
+        end
+
+        jcr_path = discover_jcr_path_from_file_in_vault_package(path)
+
+        AemLookout::Sync.new(
+          hostnames: hostnames,
+          filesystem: path,
+          jcr: jcr_path,
+          log: log
+        ).run
+      end
     end
 
     def watch_sling_initial_content(path)
@@ -75,13 +116,8 @@ module AemLookout
         return
       end
 
-      fsevent = FSEvent.new
       options = {:latency => 0.1, :file_events => true}
-
-      fsevent.watch filesystem_path, options do |paths|
-        paths.delete_if {|path| ignored?(path) }
-        log.info "Detected change inside: #{paths.inspect}" unless paths.empty?
-        
+      fsevent = create_threaded_fsevent filesystem_path.to_s, options do |paths|
         begin
           handle_sling_initial_content_change(paths, filesystem_path, jcr_path)
         rescue LookoutError => e
@@ -117,12 +153,9 @@ module AemLookout
       pwd = Pathname(repo_path) + command_config.fetch("pwd", "")
       command = command_config.fetch("command")
 
-      fsevent = FSEvent.new
       options = {:latency => 1, :file_events => true}
-      fsevent.watch watch_path, options do |paths|
-        paths.delete_if {|path| ignored?(path) }
+      fsevent = create_threaded_fsevent watch_path, options do |paths|
         break if paths.empty?
-        log.info "Detected change inside: #{paths.inspect}"
         log.info "Running command"
         Terminal.new(log).execute_command("cd #{pwd} && #{command}")
       end
