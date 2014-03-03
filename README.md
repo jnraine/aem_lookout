@@ -1,24 +1,28 @@
 # AemLookout
 
-TODO: Write a gem description
+Automatically deploys code changes while developing.
 
-## Installation
+A short loop between when you make changes and when you see those changes is an important step to productivity!
 
-Add this line to your application's Gemfile:
+## Install
 
-    gem 'aem_lookout'
+```
+gem install aem_lookout
+```
 
-And then execute:
+or add the following to your Gemfile:
 
-    $ bundle
+```
+gem 'aem_lookout'
+```
 
-Or install it yourself as:
-
-    $ gem install aem_lookout
+and run `bundle install` from your shell.
 
 ## Usage
 
-TODO: Write usage instructions here
+1. Create a lookout.json file for your code base, similar to the (example config file)[https://github.com/jnraine/aem_lookout/blob/master/example_config.json].
+2. Run `lookout` from the command line. May need to run `bundle exec lookout` if the executable is not found.
+3. Edit files — .java, .css, .content.xml, whatever — and watch them deploy to your local instance.
 
 ## Contributing
 
